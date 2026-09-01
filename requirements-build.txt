@@ -1,0 +1,3 @@
+# Dipendenze per compilare l'.exe:  python build.py
+-r requirements.txt
+pyinstaller==6.11.1
