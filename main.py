@@ -16,8 +16,11 @@ import json
 import queue
 import random
 import socket
+import logging
 import calendar
 import threading
+import traceback
+import time
 from datetime import datetime, date
 
 import tkinter as tk
@@ -82,6 +85,14 @@ def app_dir():
 
 
 CONFIG_PATH = os.path.join(app_dir(), "config.json")
+LOG_PATH = os.path.join(app_dir(), "app.log")
+
+logging.basicConfig(
+    filename=LOG_PATH,
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+)
+log = logging.getLogger(APP_NAME)
 
 
 def load_config():
@@ -125,14 +136,22 @@ _lock_socket = None
 
 def acquire_single_instance():
     global _lock_socket
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        s.bind(("127.0.0.1", LOCK_PORT))
-        s.listen(1)
-    except OSError:
-        return False
-    _lock_socket = s
-    return True
+    # all'avvio di Windows una vecchia socket (chiusura non pulita) puo'
+    # restare occupata ancora per qualche istante: qualche tentativo in piu'
+    # evita di rinunciare per un falso positivo.
+    for attempt in range(5):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.bind(("127.0.0.1", LOCK_PORT))
+            s.listen(1)
+        except OSError:
+            s.close()
+            if attempt < 4:
+                time.sleep(1)
+            continue
+        _lock_socket = s
+        return True
+    return False
 
 
 # --------------------------------------------------------------------------
@@ -260,8 +279,8 @@ def process_queue():
             fn = gui_queue.get_nowait()
             try:
                 fn()
-            except Exception as e:
-                print("GUI task error:", e)
+            except Exception:
+                log.error("GUI task error:\n%s", traceback.format_exc())
     except queue.Empty:
         pass
     root.after(200, process_queue)
@@ -552,8 +571,18 @@ def show_greeting(occ):
     win.bind("<Escape>", lambda e: fade_close(win))
     place_center(win, w, h)
     fade_in(win)
-    win.after(60000, lambda: win.winfo_exists() and fade_close(win))
     win.focus_force()
+
+    def _resurface():
+        if win.winfo_exists():
+            win.attributes("-topmost", True)
+            win.lift()
+            win.focus_force()
+    # subito dopo l'avvio di Windows altre finestre (notifiche, shell, ecc.)
+    # possono rubare il topmost: ripeto la richiesta un paio di volte cosi'
+    # l'augurio non resta nascosto sotto senza che nessuno se ne accorga.
+    win.after(1000, _resurface)
+    win.after(3000, _resurface)
 
 
 # --- dialog data ------------------------------------------------------------
@@ -796,6 +825,17 @@ def refresh_menu():
 # --------------------------------------------------------------------------
 # Loop di controllo
 # --------------------------------------------------------------------------
+def _mark_shown_and_greet(occ, day_iso):
+    # segna il giorno come avvisato solo DOPO che il popup e' stato creato,
+    # cosi' un fallimento nella finestra (es. appena dopo il boot) fa ritentare
+    # al giro successivo invece di bruciare l'unico tentativo della giornata
+    show_greeting(occ)
+    cfg = load_config()
+    cfg["last_greeting_date"] = day_iso
+    save_config(cfg)
+    log.info("augurio mostrato e segnato per %s", day_iso)
+
+
 def checker_loop():
     while not stop_event.is_set():
         try:
@@ -814,14 +854,14 @@ def checker_loop():
                 if occ and not already:
                     nh, nm = parse_hhmm(get_setting("night_time"))
                     mh, mm = parse_hhmm(get_setting("morning_time"))
-                    if trigger_due(now.hour * 60 + now.minute,
-                                   get_setting("trigger_night"), nh * 60 + nm,
-                                   get_setting("trigger_morning"), mh * 60 + mm):
-                        gui_queue.put(lambda o=occ: show_greeting(o))
-                        cfg["last_greeting_date"] = today.isoformat()
-                        save_config(cfg)
-        except Exception as e:
-            print("checker error:", e)
+                    due = trigger_due(now.hour * 60 + now.minute,
+                                       get_setting("trigger_night"), nh * 60 + nm,
+                                       get_setting("trigger_morning"), mh * 60 + mm)
+                    log.info("occasione %s trovata per %s, due=%s", occ["type"], today, due)
+                    if due:
+                        gui_queue.put(lambda o=occ, d=today.isoformat(): _mark_shown_and_greet(o, d))
+        except Exception:
+            log.error("checker error:\n%s", traceback.format_exc())
         stop_event.wait(30)
 
 
