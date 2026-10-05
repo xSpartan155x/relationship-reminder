@@ -39,3 +39,14 @@ input[type='number']::-webkit-outer-spin-button {
 ::selection {
   background: #f6c9da;
 }
+
+/* toglie l'alone giallo/arancio di default di Chromium sui bottoni con focus
+   (es. autoFocus), sostituito da un ring coerente con la palette solo dove
+   serve davvero (focus-visible da tastiera). */
+button {
+  outline: none;
+}
+button:focus-visible {
+  outline: 2px solid #d12d66;
+  outline-offset: 2px;
+}

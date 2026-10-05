@@ -7,7 +7,7 @@ const VIEW_SIZE: Record<ViewName, { w: number; h: number }> = {
   'set-date': { w: 380, h: 520 },
   summary: { w: 380, h: 372 },
   settings: { w: 380, h: 560 },
-  greeting: { w: 380, h: 360 },
+  greeting: { w: 380, h: 388 },
 }
 
 const openWindows = new Map<ViewName, BrowserWindow>()

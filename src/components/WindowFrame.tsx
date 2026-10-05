@@ -24,10 +24,17 @@ export default function WindowFrame({ children, header, footer, onClose, bodyCla
         transition={{ duration: 0.28, ease: [0.34, 1.56, 0.64, 1] }}
         className="relative flex h-full w-full flex-col overflow-hidden rounded-[18px] border border-blush-line bg-white shadow-card"
       >
-        {onClose && <CloseButton onClick={onClose} />}
         {header}
-        <div className={`flex flex-1 flex-col overflow-hidden ${bodyClassName}`}>{children}</div>
+        {/* "relative" e' necessario: senza un contenitore posizionato qui, un
+            figlio "absolute inset-0" (es. FloatingHearts) si aggancia alla
+            card intera invece che a quest'area e finisce per dipingersi sopra
+            il footer/i bottoni invece di restare confinato al corpo. */}
+        <div className={`relative flex flex-1 flex-col overflow-hidden ${bodyClassName}`}>{children}</div>
         {footer}
+        {/* Renderizzato per ultimo (sopra l'header "drag" nell'ordine di pittura):
+            su Windows la regione draggable dell'header altrimenti "vince" sui
+            pixel sovrapposti e i click sulla X vengono letti come drag della finestra. */}
+        {onClose && <CloseButton onClick={onClose} />}
       </motion.div>
     </div>
   )

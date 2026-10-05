@@ -20,7 +20,7 @@ export default function PillButton({ children, onClick, variant = 'primary', cla
     <button
       onClick={onClick}
       autoFocus={autoFocus}
-      className={`no-drag min-w-[110px] rounded-full px-6 py-2.5 text-[12.5px] font-bold tracking-wide transition-all duration-150 active:scale-[0.96] ${VARIANTS[variant]} ${className}`}
+      className={`no-drag inline-flex min-w-[110px] items-center justify-center gap-1.5 rounded-full px-6 py-2.5 text-[12.5px] font-bold tracking-wide outline-none transition-all duration-150 active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-accent-dark/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${VARIANTS[variant]} ${className}`}
     >
       {children}
     </button>
